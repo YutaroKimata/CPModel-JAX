@@ -3,7 +3,7 @@
 Exact-hat counterfactuals for the multi-country, multi-sector model of
 [Caliendo and Parro (2015)](https://doi.org/10.1093/restud/rdu035).
 
-The solver uses JAX automatic differentiation and a matrix-free Newton–Krylov method with GMRES. Nominal trade deficits are fixed at baseline levels, and world nominal value added is the numeraire.
+The solver uses JAX automatic differentiation and a matrix-free Newton–Krylov method.
 
 ## Install
 
@@ -44,7 +44,7 @@ The last three are optional counterfactual shocks.
 
 ## Outputs
 
-Ratios are counterfactual relative to baseline. Monetary levels retain the input units.
+Ratios are counterfactual relative to baseline.
 
 | Key | Shape |
 | --- | --- |
@@ -60,17 +60,6 @@ Ratios are counterfactual relative to baseline. Monetary levels retain the input
 | `consumer_price_ratio` | `(N,)` |
 | `welfare_ratio` | `(N,)` |
 | `real_wage_ratio` | `(N,)` |
-| `counterfactual_trade_shares` | `(N,N,J)` |
-| `counterfactual_expenditure` | `(N,J)` |
-| `counterfactual_trade_value` | `(N,N,J)` |
-| `counterfactual_net_trade_value` | `(N,N,J)` |
-| `counterfactual_output` | `(N,J)` |
-| `counterfactual_income` | `(N,)` |
-| `iterations` | scalar |
-| `log_ratios` | `(N+2*N*J,)` |
-| `residual` | `(N+2*N*J,)` |
-| `diagnostics` | dictionary |
-| `wall_seconds` | scalar |
 
 ## NAFTA example
 
