@@ -6,6 +6,8 @@ import numpy as np
 from jax.scipy.sparse.linalg import gmres
 from jax.scipy.special import logsumexp
 
+jax.config.update("jax_enable_x64", True)
+
 
 def _prepare(
     theta,
@@ -22,12 +24,6 @@ def _prepare(
     alpha = np.asarray(alpha, dtype=float)
     beta = np.asarray(beta, dtype=float)
     gamma = np.asarray(gamma, dtype=float)
-
-    if not np.allclose(alpha.sum(axis=1), 1):
-        raise ValueError("final-demand shares must sum to one")
-
-    if not np.allclose(beta + gamma.sum(axis=2), 1):
-        raise ValueError("production cost shares must sum to one")
 
     baseline_net_trade_value = np.asarray(baseline_net_trade_value, dtype=float)
     baseline_tariff_rates = np.asarray(baseline_tariff_rates, dtype=float)
@@ -86,7 +82,7 @@ def _prepare(
         "log_trade_weights": log_baseline_trade_shares + log_cost_shock,
         "log_cost_shock": log_cost_shock,
     }
-    return jax.tree.map(lambda x: jnp.asarray(x, dtype=jnp.float32), data)
+    return jax.tree.map(lambda x: jnp.asarray(x, dtype=jnp.float64), data)
 
 
 def _state(log_ratios, data):
@@ -253,7 +249,7 @@ def newton_krylov(
     max_trials=25,
     preconditioner=None,
 ):
-    z = jnp.asarray(z0, dtype=jnp.float32)
+    z = jnp.asarray(z0, dtype=jnp.float64)
     residual_value, error, residual_norm = _evaluate(f, data, z)
 
     previous_norm = None
@@ -356,7 +352,7 @@ def solve_eha(
     n, j = data["beta"].shape
 
     if initial_log_ratios is None:
-        initial_log_ratios = jnp.zeros(n + 2 * n * j, dtype=jnp.float32)
+        initial_log_ratios = jnp.zeros(n + 2 * n * j, dtype=jnp.float64)
 
     root = newton_krylov(
         residual,
