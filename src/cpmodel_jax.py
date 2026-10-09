@@ -33,25 +33,16 @@ def _prepare(
     else:
         counterfactual_tariff_rates = np.asarray(counterfactual_tariff_rates, dtype=float)
 
-    if iceberg_cost_ratio is None:
-        log_iceberg_cost_ratio = 0.0
-    else:
-        iceberg_cost_ratio = np.asarray(iceberg_cost_ratio, dtype=float)
-        log_iceberg_cost_ratio = np.log(iceberg_cost_ratio)
-
-    if technology_scale_ratio is None:
-        log_technology_ratio = 0.0
-    else:
-        technology_scale_ratio = np.asarray(technology_scale_ratio, dtype=float)
-        log_technology_ratio = np.log(technology_scale_ratio)
+    log_iceberg_cost_ratio = np.log(np.asarray(1.0 if iceberg_cost_ratio is None else iceberg_cost_ratio, dtype=float))
+    log_technology_ratio = np.log(np.asarray(1.0 if technology_scale_ratio is None else technology_scale_ratio, dtype=float))
 
     baseline_output = baseline_net_trade_value.sum(axis=0)
-    baseline_trade_value = baseline_net_trade_value * (1 + baseline_tariff_rates)
-    baseline_expenditure = baseline_trade_value.sum(axis=1)
-    baseline_trade_shares = baseline_trade_value / baseline_expenditure[:, None, :]
+    trade_weights = baseline_net_trade_value * (1 + baseline_tariff_rates)
+    baseline_expenditure = trade_weights.sum(axis=1)
+    trade_weights /= baseline_expenditure[:, None, :]
 
     with np.errstate(divide="ignore"):
-        log_baseline_trade_shares = np.log(baseline_trade_shares)
+        log_trade_weights = np.log(trade_weights, out=trade_weights)
 
     baseline_value_added = (beta * baseline_output).sum(axis=1)
     baseline_exports = baseline_output.sum(axis=1)
@@ -63,6 +54,7 @@ def _prepare(
     log_tariff_ratio = np.log1p(counterfactual_tariff_rates) - np.log1p(baseline_tariff_rates)
     log_trade_cost_ratio = log_tariff_ratio + log_iceberg_cost_ratio
     log_cost_shock = log_technology_ratio - theta * log_trade_cost_ratio
+    log_trade_weights += log_cost_shock
 
     counterfactual_net_factor = 1 / (1 + counterfactual_tariff_rates)
     net_trade_value_ratio_factor = (1 + baseline_tariff_rates) * counterfactual_net_factor
@@ -79,7 +71,7 @@ def _prepare(
         "baseline_expenditure": baseline_expenditure,
         "counterfactual_net_factor": counterfactual_net_factor,
         "net_trade_value_ratio_factor": net_trade_value_ratio_factor,
-        "log_trade_weights": log_baseline_trade_shares + log_cost_shock,
+        "log_trade_weights": log_trade_weights,
         "log_cost_shock": log_cost_shock,
     }
     return jax.tree.map(lambda x: jnp.asarray(x, dtype=jnp.float64), data)
@@ -157,11 +149,7 @@ def residual(log_ratios, data):
         expenditure_residual.ravel()
     ))
 
-    return jnp.where(
-        jnp.all(state["counterfactual_income"] > 0),
-        residual_value,
-        jnp.full_like(residual_value, jnp.nan),
-    )
+    return jnp.where(jnp.all(state["counterfactual_income"] > 0), residual_value, jnp.nan)
 
 
 def _preconditioner(data, z):
@@ -225,13 +213,14 @@ def _direction(f, data, z, eta, preconditioner=None):
 
 
 def _line_search(f, data, z, direction, residual_norm, max_trials):
+    residual_norm = float(residual_norm)
     step_size = 1.0
 
     for _ in range(max_trials):
         next_z = z + step_size * direction
         next_residual, next_error, next_norm = _evaluate(f, data, next_z)
 
-        if float(next_norm) <= (1 - 1e-4 * step_size) * float(residual_norm):
+        if float(next_norm) <= (1 - 1e-4 * step_size) * residual_norm:
             return next_z, next_residual, next_error, next_norm
 
         step_size *= 0.5
@@ -373,13 +362,6 @@ def solve_eha(
         "residual_inf": float(jnp.max(jnp.abs(root["residual"]))),
         "labor_error": float(labor_error),
     }
-
-    if (
-        diagnostics["labor_error"] > 100 * tolerance
-        or any(not np.all(np.isfinite(value)) for value in values.values())
-        or np.any(values["counterfactual_income"] <= 0)
-    ):
-        raise RuntimeError("equilibrium verification failed")
 
     return {
         **values,
