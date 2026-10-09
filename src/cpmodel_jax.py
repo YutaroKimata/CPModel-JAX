@@ -20,24 +20,12 @@ def _prepare(
     iceberg_cost_ratio=None,
     technology_scale_ratio=None,
 ):
-    theta = np.asarray(theta, dtype=float)
-    alpha = np.asarray(alpha, dtype=float)
-    beta = np.asarray(beta, dtype=float)
-    gamma = np.asarray(gamma, dtype=float)
-
-    baseline_net_trade_value = np.asarray(baseline_net_trade_value, dtype=float)
-    baseline_tariff_rates = np.asarray(baseline_tariff_rates, dtype=float)
-
-    if counterfactual_tariff_rates is None:
-        counterfactual_tariff_rates = baseline_tariff_rates
-    else:
-        counterfactual_tariff_rates = np.asarray(counterfactual_tariff_rates, dtype=float)
-
-    log_iceberg_cost_ratio = np.log(np.asarray(1.0 if iceberg_cost_ratio is None else iceberg_cost_ratio, dtype=float))
-    log_technology_ratio = np.log(np.asarray(1.0 if technology_scale_ratio is None else technology_scale_ratio, dtype=float))
+    counterfactual_tariff_rates = baseline_tariff_rates if counterfactual_tariff_rates is None else counterfactual_tariff_rates
+    log_iceberg_cost_ratio = np.log(1.0 if iceberg_cost_ratio is None else iceberg_cost_ratio)
+    log_technology_ratio = np.log(1.0 if technology_scale_ratio is None else technology_scale_ratio)
 
     baseline_output = baseline_net_trade_value.sum(axis=0)
-    trade_weights = baseline_net_trade_value * (1 + baseline_tariff_rates)
+    trade_weights = baseline_net_trade_value * (1.0 + baseline_tariff_rates)
     baseline_expenditure = trade_weights.sum(axis=1)
     trade_weights /= baseline_expenditure[:, None, :]
 
@@ -56,8 +44,8 @@ def _prepare(
     log_cost_shock = log_technology_ratio - theta * log_trade_cost_ratio
     log_trade_weights += log_cost_shock
 
-    counterfactual_net_factor = 1 / (1 + counterfactual_tariff_rates)
-    net_trade_value_ratio_factor = (1 + baseline_tariff_rates) * counterfactual_net_factor
+    counterfactual_net_factor = 1.0 / (1.0 + counterfactual_tariff_rates)
+    net_trade_value_ratio_factor = (1.0 + baseline_tariff_rates) * counterfactual_net_factor
 
     data = {
         "theta": theta,
